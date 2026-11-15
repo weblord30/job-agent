@@ -39,6 +39,7 @@ async function linkedin() {
 async function reddit() {
   const out = [];
   for (const sub of ["forhire", "DesignJobs", "freelance_forhire", "remotejs"]) {
+    if (sub !== "forhire") await sleep(6000); // Reddit rate-limits fast requests
     let r = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=40&raw_json=1`, { headers: { "user-agent": "job-agent/1.0 (personal job alerts)" } });
     if (r.ok) {
       const j = await r.json();
