@@ -38,7 +38,7 @@ async function linkedin() {
 // ---------- Reddit (JSON, falls back to RSS) ----------
 async function reddit() {
   const out = [];
-  for (const sub of ["forhire", "DesignJobs", "freelance_forhire", "remotejs"]) {
+  for (const sub of ["forhire", "DesignJobs", "remotejs", "hiring"]) {
     if (sub !== "forhire") await sleep(6000); // Reddit rate-limits fast requests
     let r = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=40&raw_json=1`, { headers: { "user-agent": "job-agent/1.0 (personal job alerts)" } });
     if (r.ok) {
@@ -93,7 +93,14 @@ async function x(watch) {
   await ctx.addCookies(JSON.parse(X_COOKIES));
   const page = await ctx.newPage();
   const tweets = new Map();
-  page.on("response", async r => { if (/SearchTimeline|UserTweets|UserByScreenName/.test(r.url())) { try { tweetsFrom(await r.json(), tweets); } catch {} } });
+  const seen = {};
+  page.on("response", async r => {
+    const u = r.url();
+    if (!/\/graphql\//.test(u)) return;
+    const op = u.split("/graphql/")[1]?.split("/")[1]?.split("?")[0] || "?";
+    seen[op] = (seen[op] || 0) + 1;
+    try { const before = tweets.size; tweetsFrom(await r.json(), tweets); seen[op + ":tweets"] = (seen[op + ":tweets"] || 0) + tweets.size - before; } catch (e) { seen[op + ":err"] = r.status(); }
+  });
   const visit = async (url) => {
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -105,7 +112,7 @@ async function x(watch) {
   try {
     for (const q of X_SEARCHES) await visit(`https://x.com/search?q=${encodeURIComponent(q)}&src=typed_query&f=live`);
     for (const h of watch.slice(0, 15)) await visit(`https://x.com/${h}`);
-  } finally { await browser.close(); }
+  } finally { log("x graphql", JSON.stringify(seen), "url", page.url(), "title", await page.title().catch(() => "")); await browser.close(); }
   const fresh = [...tweets.values()].filter(t => Date.now() - t.at < 2 * 864e5);
   return fresh.map(t => ({
     id: "x:" + t.id, source: watch.some(h => h.toLowerCase() === t.handle.toLowerCase()) ? "X watchlist" : "X",
