@@ -1,0 +1,1 @@
+{ "name": "job-agent", "private": true, "type": "module", "dependencies": { "playwright": "1.49.1" } }

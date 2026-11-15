@@ -1,0 +1,28 @@
+name: agent
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+concurrency: { group: agent, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: node agent.mjs
+        env:
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+          WORKER_KEY: ${{ secrets.WORKER_KEY }}
+          X_COOKIES: ${{ secrets.X_COOKIES }}
+      # GitHub pauses scheduled workflows after 60 days without commits; touch a file monthly.
+      - name: keepalive
+        run: |
+          if [ "$(date +%d)" = "01" ] && [ "$(git log -1 --format=%cd --date=format:%Y-%m-%d)" != "$(date +%Y-%m-%d)" ]; then
+            date > .keepalive && git config user.name agent && git config user.email agent@users.noreply.github.com && git add .keepalive && git commit -m keepalive && git push
+          fi
